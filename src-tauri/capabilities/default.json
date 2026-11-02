@@ -1,7 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Local application window; no filesystem, shell, or other native commands exposed",
-  "windows": ["main"],
-  "permissions": []
+  "description": "Shared app window with notifications and notification-click focus; no filesystem or shell commands",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "notification:default",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize"
+  ]
 }

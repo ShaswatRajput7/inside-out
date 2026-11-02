@@ -67,7 +67,7 @@ try {
     let channel
     try {
       await new Promise((resolve, reject) => {
-        channel = receiver.channel(`qa:${id}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, ({ new: message }) => { if (message.id === id) resolveArrival(message) })
+        channel = receiver.channel(`conversation:${conversationId}:messages`, { config: { private: true } }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, ({ new: message }) => { if (message.id === id) resolveArrival(message) })
           .subscribe((status) => { if (status === 'SUBSCRIBED') resolve(); else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) reject(new Error(`Realtime ${status}`)) })
         setTimeout(() => reject(new Error('Realtime subscription timed out')), 15000).unref()
       })

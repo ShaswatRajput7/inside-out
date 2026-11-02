@@ -2,6 +2,14 @@
 
 A small, private chat app for friends. React + Vite + JavaScript + Tailwind, Supabase Auth/PostgreSQL/Realtime, and Tauri v2. No separate backend server.
 
+## Messaging features upgrade
+
+Editing/deletion, the full emoji picker and reactions, unread counts, private online/typing status,
+notifications, and private 30-day image sharing are implemented in the shared React/Tauri source.
+The incremental backend upgrade has **not** been applied to the live project. Follow
+[the rollout, Storage, cleanup schedule, notification, and testing guide](docs/MESSAGING_UPGRADE.md)
+before deploying this frontend. Apply migration 002 after the existing 001; do not reset or rerun 001.
+
 ## Run locally
 
 Use Node.js 22.12+ (Node 24 recommended) and npm.
@@ -63,6 +71,7 @@ src/
   pages/        Login and chat workspace
   services/     Supabase client and small query/RPC functions
   lib/          Username identity and message ordering helpers
+  platform/     Browser/Tauri detection and future desktop adapters
 supabase/migrations/001_inside_out.sql
 src-tauri/      Rust desktop shell, config, capabilities, generated app icons
 .github/workflows/   Web checks and desktop installer builds
@@ -77,7 +86,9 @@ The group role column records creator/admin and member; no role promotion interf
 
 ## Tests and verification limits
 
-Local verification completed: `npm run build`, `npm run lint` (zero warnings), all 15 tests, login-screen visual inspection, and Tauri configuration/schema/icon checks. Native compilation was attempted and stopped at `cargo metadata` because Rust/Cargo are not installed. No installers have been produced locally. Supabase is configured in the existing Inside Out project: migration applied, email confirmation disabled, and ignored `.env` connected with the publishable key. Hosted smoke checks passed for registration/login, exact lookup, concurrent direct creation, frontend PostgREST joins, outsider/spoofing denial, bidirectional Realtime messages, group messaging, creator-only membership changes, removal access revocation, and history after a new login, and hosted timestamp/UUID cursor queries. Browser checks also passed for login, sending direct messages, exact member lookup, group creation, group member controls, Shift+Enter multiline messages, and persistent login/history after reload. Three generated QA accounts and sample chats remain for inspection; their credentials are stored only in the mode-0600 temporary `inside-out-qa.json` fixture file.
+Baseline verification before the messaging upgrade (see the upgrade guide for current checks): `npm run build`, `npm run lint` (zero warnings), and all 20 tests. `npx tauri dev` compiled and launched on macOS Apple Silicon after installing the minimal stable Rust/Cargo toolchain. The native WebKit window was checked for password login, restored login after quitting/reopening, direct/group navigation, stored history, sending a message, and receiving a Supabase Realtime reply. For UI automation only, the compiled debug executable was also opened through a temporary local app wrapper; no distributable installer was built. Windows 10/11 and Ubuntu configuration is prepared; native execution on those operating systems and packaged release builds have not been tested on this Mac.
+
+Supabase is configured in the existing Inside Out project, with connection values in ignored `.env`. The existing hosted smoke script passed again, including exact lookup, concurrent direct creation, PostgREST joins/cursors, outsider/spoofing denial, Realtime direct/group messages, and membership access revocation. Three additional generated QA accounts and their sample chats remain for inspection; credentials are only in the mode-0600 temporary `inside-out-qa.json` fixture file. No database schema or Cloudflare deployment configuration was changed for desktop integration.
 
 `npm test` uses Node's test runner and PGlite, a real PostgreSQL engine compiled to WASM. It applies the complete migration, stubs only `auth.users` and `auth.uid()`, switches to authenticated/anonymous database roles, and checks:
 
@@ -118,7 +129,59 @@ npx wrangler pages deploy dist --project-name inside-out
 
 Run that only when you intend to publish. Changing environment variables requires a fresh build/deployment. The free hosted Supabase tier can pause idle projects; resume an idle project in its dashboard if needed. GitHub Actions quotas and provider free-tier policies still apply.
 
-## Desktop development and installers
+## Desktop development
+
+Keep developing features in the existing React components, hooks, and Supabase services.
+The native shell opens this same frontend; it does not load the deployed Cloudflare URL.
+No chat/auth code is forked, and no extra backend or Supabase schema is needed.
+Installers can be built later, when a version is ready to share.
+
+On this Mac, the minimal stable Rust/Cargo toolchain is installed without modifying shell
+profiles. Load Cargo into a fresh terminal session, then launch the desktop app:
+
+```sh
+source "$HOME/.cargo/env"
+npx tauri dev
+# Equivalent: npm run desktop:dev
+```
+
+Keep the existing `.env` with `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY`. Do not copy the example over working credentials.
+Tauri starts Vite at **http://127.0.0.1:1420** automatically. `npm run dev` remains
+on port **5173**, so browser and desktop development can run at the same time.
+React changes hot-reload in the webview; Rust/config changes are handled by Tauri.
+Closing the window or stopping the dev command ends the development app. No installer,
+code signing, updater, notifications, or paid Apple account is involved.
+
+The window is titled **Inside Out**, starts centered at **1180 × 780**, resizes down to
+**760 × 560**, and uses the stable identifier **com.insideout.chat**. Keep that identifier
+stable for future builds. The non-incognito webview data store persists Supabase sessions
+between launches. Browser, desktop development, and a future packaged desktop app each
+have their own local session storage; log in once in each runtime. They all use the same
+Supabase accounts, conversations, and messages.
+
+Auth uses password requests directly (no OAuth/deep-link callback is needed). Supabase's
+existing auto-refresh, Postgres Changes subscriptions, reconnect/focus handlers, and
+history queries run inside the webview unchanged. CSP permits the Supabase HTTPS and
+WebSocket endpoints; development also permits the Vite HMR socket. Navigation is existing
+React state inside one HTML entry, with no server routes or new routing dependency.
+The Cloudflare build command, output directory, headers, and redirects are unchanged.
+
+For platform-specific work, use the browser-safe utility:
+
+```js
+import { isDesktop, getRuntime } from './platform/index.js'
+
+isDesktop()  // true in Tauri, false in the browser
+getRuntime() // 'tauri' or 'browser'
+```
+
+Future native adapters belong in `src/platform/desktop/`; its README explains where to
+add plugins and narrowly scoped Tauri capability permissions when a feature actually
+needs them. The current shell exposes no filesystem/shell/notification commands.
+Do not add native API imports to the chat or Supabase services.
+
+### Prerequisites on another Mac, Ubuntu, or Windows machine
 
 Install the stable Rust toolchain from https://rustup.rs. On macOS install Xcode command-line tools (`xcode-select --install`). If macOS bundling reports missing Xcode tools, install/select full Xcode as directed by Tauri. No paid Apple account is required.
 
@@ -133,8 +196,33 @@ Then, with `.env` configured:
 
 ```sh
 npm ci
-npm run desktop:dev
+source "$HOME/.cargo/env"
+npx tauri dev
 ```
+
+On **Windows 10/11 x64**, install Node.js, the stable Rust **MSVC** toolchain, and
+Microsoft C++ Build Tools with **Desktop development with C++** and a Windows SDK.
+Install the **Microsoft Edge WebView2 Evergreen Runtime** if it is missing. These are
+the standard [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/#windows).
+Open a new terminal after installing Rust so Cargo is available, configure the same
+`.env`, then run:
+
+```powershell
+npm ci
+npx tauri dev
+```
+
+Windows uses WebView2; macOS and Ubuntu use their system WebKit webviews. All run the
+same React frontend, password authentication, session storage, and Supabase HTTPS /
+Realtime WebSocket integration. No Windows-specific chat code or native permissions
+are needed. Windows login/session/realtime behavior still needs an actual Windows
+smoke test before distributing a release.
+
+### Future installers (not part of daily development)
+
+The existing manual GitHub workflow and bundle targets remain ready for later use.
+These commands are only needed when preparing a distributable release; no installers
+are created as part of `npx tauri dev`.
 
 macOS Apple Silicon, on a Mac:
 
@@ -156,14 +244,27 @@ Ubuntu x64, **on Ubuntu**:
 npm run desktop:build -- --bundles deb,appimage
 ```
 
+Windows 10/11 x64, **on Windows**, when ready to build installers:
+
+```powershell
+rustup target add x86_64-pc-windows-msvc
+npm run desktop:build -- --target x86_64-pc-windows-msvc --bundles "nsis,msi"
+```
+
+This prepares an NSIS setup `.exe` and a WiX `.msi` in the `nsis/` and `msi/`
+bundle subdirectories. The configured WebView2 download bootstrapper installs the
+runtime if it is absent, using an internet connection. MSI builds require the Windows
+VBSCRIPT optional feature; see [Tauri's Windows installer guide](https://v2.tauri.app/distribute/windows-installer/)
+if WiX reports an error. No signing certificates or updater are configured.
+
 Artifacts are under `src-tauri/target/<target>/release/bundle/` when `--target` is supplied, otherwise `src-tauri/target/release/bundle/`. macOS installers are unsigned/unnotarized: recipients may need the normal macOS Privacy & Security **Open Anyway** flow. AppImage requires FUSE on some systems; `chmod +x ./Inside*.AppImage` then `./Inside*.AppImage --appimage-extract-and-run` is an alternative (use the actual filename). A `.deb` can be installed with `sudo apt install ./inside-out*.deb` (use the actual output filename).
 
 ### GitHub Actions builds
 
 1. Push to your own repository. Add repository **Settings → Secrets and variables → Actions** secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 2. Open **Actions → Desktop installers → Run workflow**.
-3. The matrix builds Apple Silicon `.dmg`, Intel `.dmg`, and Ubuntu x64 `.deb`/`.AppImage` using macOS and Ubuntu runners. Download the resulting workflow artifacts. It does not publish releases or deploy the website.
-4. Use GitHub's included runner allowance; private repository macOS jobs consume that allowance faster. Desktop builds are manual to avoid unnecessary usage. No Linux build is attempted on macOS.
+3. When manually triggered, the matrix builds Apple Silicon `.dmg` and Intel `.dmg` on macOS runners, Ubuntu x64 `.deb`/`.AppImage` on an Ubuntu runner, and Windows x64 NSIS `.exe`/`.msi` on a Windows runner. Download the resulting workflow artifacts. It does not publish releases or deploy the website. The workflow has not been triggered for this configuration change.
+4. Use GitHub's included runner allowance; private repository macOS jobs consume that allowance faster. Desktop builds are manual to avoid unnecessary usage. Each operating system builds its own installers; no cross-compilation setup is added.
 
 The workflow installs Rust and platform libraries. The local machine must also have Rust to compile; `npm run tauri info` diagnoses prerequisites. App icons are generated from `public/icon.svg` using `npm run tauri icon public/icon.svg`.
 
@@ -172,4 +273,5 @@ The workflow installs Rust and platform libraries. The local machine must also h
 - [Supabase password auth](https://supabase.com/docs/guides/auth/passwords) and [confirmation configuration](https://supabase.com/docs/guides/auth/general-configuration).
 - [Supabase Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security) and [Postgres Changes](https://supabase.com/docs/guides/realtime/postgres-changes).
 - [Tauri GitHub builds](https://v2.tauri.app/distribute/pipelines/github/) and [icons](https://v2.tauri.app/develop/icons/).
+- [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/#windows) and [Windows installers / WebView2](https://v2.tauri.app/distribute/windows-installer/).
 - [Cloudflare Pages framework setup](https://developers.cloudflare.com/pages/framework-guides/).

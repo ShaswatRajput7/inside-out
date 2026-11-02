@@ -1,0 +1,23 @@
+# OPTIONAL fallback: copy to .github/workflows/image-cleanup.yml only when choosing this scheduler.
+# Configure both repository secrets first. Do not also run the Supabase Cron job.
+name: Daily image cleanup
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+permissions:
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke authorized cleanup function
+        env:
+          INSIDE_OUT_PROJECT_URL: ${{ secrets.INSIDE_OUT_PROJECT_URL }}
+          IMAGE_CLEANUP_SECRET: ${{ secrets.IMAGE_CLEANUP_SECRET }}
+        run: |
+          test -n "$INSIDE_OUT_PROJECT_URL" && test -n "$IMAGE_CLEANUP_SECRET"
+          curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors \
+            --request POST "$INSIDE_OUT_PROJECT_URL/functions/v1/cleanup-images" \
+            --header 'Content-Type: application/json' \
+            --header "x-cleanup-secret: $IMAGE_CLEANUP_SECRET" --data '{}'

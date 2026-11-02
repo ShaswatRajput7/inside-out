@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 
+const MESSAGE_FIELDS = 'id,conversation_id,sender_id,content,created_at,kind,edited_at,deleted_at,updated_at,sender:profiles!messages_sender_id_fkey(display_name,username),image:chat_image_uploads!messages_image_id_fkey(id,storage_path,mime_type,width,height,state,uploaded_at,expires_at)'
+
 async function unwrap(request) {
   const { data, error } = await request
   if (error) throw error
@@ -19,7 +21,7 @@ export async function getConversations() {
   return data || []
 }
 export async function getMessages(id, { before, after, forward = false, limit = 50 } = {}) {
-  let query = supabase.from('messages').select('id,conversation_id,sender_id,content,created_at,sender:profiles!messages_sender_id_fkey(display_name,username)').eq('conversation_id', id)
+  let query = supabase.from('messages').select(MESSAGE_FIELDS).eq('conversation_id', id)
   const cursor = before || after
   if (cursor) {
     const op = before ? 'lt' : 'gt'
@@ -28,4 +30,24 @@ export async function getMessages(id, { before, after, forward = false, limit = 
   const ascending = Boolean(after) || forward
   return unwrap(query.order('created_at', { ascending }).order('id', { ascending }).limit(limit))
 }
-export const sendMessage = (conversationId, senderId, content, id) => unwrap(supabase.from('messages').insert({ id, conversation_id: conversationId, sender_id: senderId, content }).select('id,conversation_id,sender_id,content,created_at,sender:profiles!messages_sender_id_fkey(display_name,username)').single())
+export const sendMessage = (conversationId, senderId, content, id) => unwrap(supabase.from('messages').insert({ id, conversation_id: conversationId, sender_id: senderId, content }).select(MESSAGE_FIELDS).single())
+
+export const editMessage = (id, content) => unwrap(supabase.rpc('edit_message', { target_message: id, new_content: content }))
+export const deleteMessage = (id) => unwrap(supabase.rpc('delete_message', { target_message: id }))
+export const toggleReaction = (id, emoji) => unwrap(supabase.rpc('toggle_reaction', { target_message: id, reaction_emoji: emoji }))
+export const getUnreadCounts = () => unwrap(supabase.rpc('conversation_unreads'))
+export const markRead = (conversationId, messageId) => unwrap(supabase.rpc('mark_conversation_read', { target_conversation: conversationId, through_message: messageId }))
+export async function getReactions(conversationId, messageIds) {
+  if (!messageIds.length) return []
+  const rows = []
+  for (let chunk = 0; chunk < messageIds.length; chunk += 100) {
+    for (let offset = 0; ; offset += 1000) {
+      const page = await unwrap(supabase.from('message_reactions').select('*').eq('conversation_id', conversationId).in('message_id', messageIds.slice(chunk, chunk + 100)).is('removed_at', null).order('message_id').order('user_id').order('emoji').range(offset, offset + 999))
+      rows.push(...page)
+      if (page.length < 1000) break
+    }
+  }
+  return rows
+}
+export const getMessage = (id) => unwrap(supabase.from('messages').select(MESSAGE_FIELDS).eq('id', id).single())
+export const getMessagesByIds = (ids) => unwrap(supabase.from('messages').select(MESSAGE_FIELDS).in('id', ids))

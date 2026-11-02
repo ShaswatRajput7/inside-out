@@ -25,7 +25,7 @@ export function useConversations(userId) {
   useEffect(() => {
     alive.current = true
     void refresh()
-    const channel = supabase.channel(`conversations:${userId}`)
+    const channel = supabase.channel(`account:${userId}:conversations`, { config: { private: true } })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members', filter: `user_id=eq.${userId}` }, refresh)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'conversations' }, refresh)
       .subscribe((status) => { if (status === 'SUBSCRIBED') void refresh() })

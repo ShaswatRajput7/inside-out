@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:desktop": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "lint": "eslint .",
@@ -14,7 +15,11 @@
     "desktop:build": "tauri build"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
     "@supabase/supabase-js": "^2.0.0",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-notification": "^2.8.0",
+    "emoji-mart": "^5.6.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

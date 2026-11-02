@@ -1,0 +1,5 @@
+project_id = "inside-out"
+
+[functions.cleanup-images]
+# Cron uses its dedicated secret; user-triggered deletion validates the Auth JWT in the function.
+verify_jwt = false
