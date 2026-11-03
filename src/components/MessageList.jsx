@@ -82,6 +82,33 @@ export default function MessageList({ messages, reactions, members, userId, titl
     const showDate = index === 0 || new Date(messages[index - 1].created_at).toDateString() !== date.toDateString()
     const name = message.sender?.display_name || names[message.sender_id] || 'Former member'
     const eligible = canReact(message, currentTime), own = message.sender_id === userId
-    return <div key={message.id} data-message-id={message.id}>{showDate && <div className="date-divider"><span>{day}</span></div>}<article className={`message ${own ? 'own-message' : ''}`}><Avatar name={name} small /><div className="message-body"><div className="message-meta"><strong>{name}</strong>{own && <span className="you-label">you</span>}<time dateTime={message.created_at} title={date.toLocaleString()}>{date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</time>{message.edited_at && !message.deleted_at && <span className="edited-label">(edited)</span>}</div>{message.deleted_at ? <p className="deleted-message">This message was deleted</p> : editing === message.id ? <MessageEditor message={message} onDone={() => setEditing(null)} onChanged={refresh} /> : <>{message.kind === 'image' && <ImageMessage message={message} now={currentTime} />}{message.content && <p>{message.content}</p>}{eligible && <div className="reaction-badges">{groupReactions(reactionMap[message.id] || [], userId).map((reaction) => <button key={reaction.emoji} className={`reaction-badge ${reaction.mine ? 'mine' : ''}`} aria-label={`${reaction.emoji}: ${reaction.count} reaction${reaction.count === 1 ? '' : 's'}${reaction.mine ? ', including you' : ''}`} aria-pressed={reaction.mine} onClick={() => react(message.id, reaction.emoji)}><span>{reaction.emoji}</span>{reaction.count}</button>)}</div>}</>}</div>{!message.deleted_at && editing !== message.id && <div className="message-actions">{eligible && <button className="icon-button" title="React with any emoji" aria-label="Add emoji reaction" onClick={(event) => { reactionAnchor.current = event.currentTarget; setReacting(message.id) }}><SmilePlus size={15} /></button>}{own && message.kind === 'text' && <button className="icon-button" title="Edit message" aria-label="Edit message" onClick={() => setEditing(message.id)}><Pencil size={14} /></button>}{own && <button className="icon-button danger" title="Delete message" aria-label="Delete message" onClick={() => setRemoving(message.id)}><Trash2 size={14} /></button>}</div>}</article></div>
+    return <div key={message.id} data-message-id={message.id}>
+      {showDate && <div className="date-divider"><span>{day}</span></div>}
+      <article className={`message ${own ? 'own-message' : 'received-message'} ${editing === message.id ? 'is-editing' : ''}`} aria-label={own ? 'Your message' : `Message from ${name}`}>
+        {!own && <Avatar name={name} small />}
+        <div className="message-body">
+          {!own && <div className="message-meta"><strong>{name}</strong></div>}
+          {message.deleted_at ? <p className="deleted-message">This message was deleted</p> : editing === message.id ?
+            <MessageEditor message={message} onDone={() => setEditing(null)} onChanged={refresh} /> : <>
+              {message.kind === 'image' && <ImageMessage message={message} now={currentTime} />}
+              {message.content && <p>{message.content}</p>}
+            </>}
+          <div className="message-footer">
+            {!message.deleted_at && editing !== message.id && <div className="message-actions" role="group" aria-label="Message actions">
+              {eligible && <button className="icon-button" title="React with any emoji" aria-label="Add emoji reaction" onClick={(event) => { reactionAnchor.current = event.currentTarget; setReacting(message.id) }}><SmilePlus size={15} /></button>}
+              {own && message.kind === 'text' && <button className="icon-button" title="Edit message" aria-label="Edit message" onClick={() => setEditing(message.id)}><Pencil size={14} /></button>}
+              {own && <button className="icon-button danger" title="Delete message" aria-label="Delete message" onClick={() => setRemoving(message.id)}><Trash2 size={14} /></button>}
+            </div>}
+            <span className="message-stamp">
+              {message.edited_at && !message.deleted_at && <span className="edited-label">edited</span>}
+              <time dateTime={message.created_at} title={date.toLocaleString()}>{date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</time>
+            </span>
+          </div>
+          {eligible && editing !== message.id && <div className="reaction-badges">
+            {groupReactions(reactionMap[message.id] || [], userId).map((reaction) => <button key={reaction.emoji} className={`reaction-badge ${reaction.mine ? 'mine' : ''}`} aria-label={`${reaction.emoji}: ${reaction.count} reaction${reaction.count === 1 ? '' : 's'}${reaction.mine ? ', including you' : ''}`} aria-pressed={reaction.mine} onClick={() => react(message.id, reaction.emoji)}><span>{reaction.emoji}</span>{reaction.count}</button>)}
+          </div>}
+        </div>
+      </article>
+    </div>
   })}</>}</div>{reacting && <EmojiPicker anchorRef={reactionAnchor} onSelect={(emoji) => react(reacting, emoji)} onClose={() => setReacting(null)} />}{removing && <Modal title="Delete this message?" description="Your message will be replaced with a deleted-message notice. Attached images will also be removed." onClose={() => { if (!busy) setRemoving(null) }}><ErrorNotice>{error}</ErrorNotice><div className="editor-actions"><button className="button secondary" onClick={() => setRemoving(null)} disabled={busy}>Cancel</button><button className="button danger-button" onClick={remove} disabled={busy}>{busy ? 'Deleting…' : 'Delete message'}</button></div></Modal>}</>
 }
