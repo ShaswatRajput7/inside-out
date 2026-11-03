@@ -4,7 +4,7 @@ import { getMessage, getMessages, getMessagesByIds, getReactions, sendMessage } 
 import { sendImage } from '../services/images'
 import { errorMessage, mergeMessages } from '../lib/chat'
 
-export function useMessages(conversationId, userId) {
+export function useMessages(conversationId, userId, onMagicChange) {
   const [messages, setMessages] = useState([])
   const [reactions, setReactions] = useState([])
   const [loading, setLoading] = useState(true)
@@ -13,6 +13,8 @@ export function useMessages(conversationId, userId) {
   const [error, setError] = useState('')
   const [connection, setConnection] = useState('connecting')
   const state = useRef(null)
+  const magicChange = useRef(onMagicChange)
+  magicChange.current = onMagicChange
   useEffect(() => {
     const scope = { active: true, messages: [], cursor: null, syncing: false, pending: false, older: false, initialized: false }
     state.current = scope
@@ -55,19 +57,28 @@ export function useMessages(conversationId, userId) {
       }
     }
     void scope.sync()
-    const channel = supabase.channel(`conversation:${conversationId}:messages`, { config: { private: true } })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, () => { void scope.sync() })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions', filter: `conversation_id=eq.${conversationId}` }, () => { void scope.sync() })
-      .subscribe((status) => {
+    let channel
+    const connect = async () => {
+      // Do not attach an unknown table to the message channel before migration 005.
+      // A missing optional feature must not prevent normal messages from connecting.
+      const supportsMagic = magicChange.current ? await magicChange.current() : false
+      if (!scope.active) return
+      channel = supabase.channel(`conversation:${conversationId}:messages`, { config: { private: true } })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, () => { void scope.sync() })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions', filter: `conversation_id=eq.${conversationId}` }, () => { void scope.sync() })
+      if (supportsMagic) channel.on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_magic', filter: `conversation_id=eq.${conversationId}` }, () => { void magicChange.current?.() })
+      channel.subscribe((status) => {
         if (!scope.active) return
-        if (status === 'SUBSCRIBED') { setConnection('connected'); void scope.sync() }
+        if (status === 'SUBSCRIBED') { setConnection('connected'); void scope.sync(); void magicChange.current?.() }
         else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) setConnection('reconnecting')
       })
+    }
+    void connect()
     const online = () => { if (scope.active) { setConnection(supabase.realtime.isConnected() ? 'connected' : 'connecting'); void scope.sync() } }
     const offline = () => { if (scope.active) setConnection('offline') }
     const interval = setInterval(scope.sync, 10000)
     window.addEventListener('online', online); window.addEventListener('offline', offline); window.addEventListener('focus', scope.sync)
-    return () => { scope.active = false; clearInterval(interval); window.removeEventListener('online', online); window.removeEventListener('offline', offline); window.removeEventListener('focus', scope.sync); void supabase.removeChannel(channel) }
+    return () => { scope.active = false; clearInterval(interval); window.removeEventListener('online', online); window.removeEventListener('offline', offline); window.removeEventListener('focus', scope.sync); if (channel) void supabase.removeChannel(channel) }
   }, [conversationId])
   const loadOlder = useCallback(async () => {
     const scope = state.current

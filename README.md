@@ -274,6 +274,8 @@ Chats now support five built-in illustrated backgrounds and private custom image
 
 Account settings now include username changes, and message Edit/Delete actions live in a three-dot menu. The username feature requires `004_username_changes.sql` followed by the `change-username` Edge Function before frontend rollout. See [username setup and verification](docs/USERNAME_CHANGES.md). Passwords and existing conversations stay with the same account.
 
+**Chat Magic** adds twelve temporary animated atmospheres to direct conversations, with shared server-timed expiry, duration presets/custom minutes, and automatic return to the existing theme. It needs only the additive `005_chat_magic.sql` migration and the existing Realtime message channel—no new packages, secrets, Storage, Edge Function or scheduler. See [Chat Magic setup, performance and verification](docs/CHAT_MAGIC.md).
+
 ## Official references
 
 - [Supabase password auth](https://supabase.com/docs/guides/auth/passwords) and [confirmation configuration](https://supabase.com/docs/guides/auth/general-configuration).
