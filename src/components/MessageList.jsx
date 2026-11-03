@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { MessageCircle, Pencil, SmilePlus, Trash2 } from 'lucide-react'
+import { MessageCircle } from 'lucide-react'
 import { Avatar, ErrorNotice, Spinner } from './Shared'
 import { canReact, groupReactions, isActivelyViewing } from '../lib/messaging'
 import { deleteMessage, toggleReaction } from '../services/chatService'
@@ -9,6 +9,7 @@ import EmojiPicker from './EmojiPicker'
 import MessageEditor from './MessageEditor'
 import ImageMessage from './ImageMessage'
 import Modal from './Modal'
+import MessageActions from './MessageActions'
 
 export default function MessageList({ messages, reactions, members, userId, title, loading, hasOlder, loadingOlder, loadOlder, refresh, onRead }) {
   const ref = useRef(null)
@@ -94,10 +95,8 @@ export default function MessageList({ messages, reactions, members, userId, titl
               {message.content && <p>{message.content}</p>}
             </>}
           <div className="message-footer">
-            {!message.deleted_at && editing !== message.id && <div className="message-actions" role="group" aria-label="Message actions">
-              {eligible && <button className="icon-button" title="React with any emoji" aria-label="Add emoji reaction" onClick={(event) => { reactionAnchor.current = event.currentTarget; setReacting(message.id) }}><SmilePlus size={15} /></button>}
-              {own && message.kind === 'text' && <button className="icon-button" title="Edit message" aria-label="Edit message" onClick={() => setEditing(message.id)}><Pencil size={14} /></button>}
-              {own && <button className="icon-button danger" title="Delete message" aria-label="Delete message" onClick={() => setRemoving(message.id)}><Trash2 size={14} /></button>}
+            {!message.deleted_at && editing !== message.id && (own || eligible) && <div className="message-actions" role="group" aria-label="Message actions">
+              <MessageActions canReact={eligible} canEdit={own && message.kind === 'text'} canDelete={own} onReact={(anchor) => { reactionAnchor.current = anchor; setReacting(message.id) }} onEdit={() => setEditing(message.id)} onDelete={() => setRemoving(message.id)} />
             </div>}
             <span className="message-stamp">
               {message.edited_at && !message.deleted_at && <span className="edited-label">edited</span>}

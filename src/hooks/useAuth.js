@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../services/supabase'
 import { getProfile } from '../services/chatService'
 import { errorMessage } from '../lib/chat'
@@ -8,6 +8,10 @@ export function useAuth() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(Boolean(supabase))
   const [error, setError] = useState('')
+  const identity = useRef(null), profileRequest = useRef(0)
+  const updateProfile = useCallback((next) => {
+    if (next?.id === identity.current) { profileRequest.current++; setProfile(next) }
+  }, [])
   useEffect(() => {
     if (!supabase) return
     let active = true
@@ -16,6 +20,8 @@ export function useAuth() {
     const update = async (session) => {
       if (!active || currentId === (session?.user?.id || null)) return
       currentId = session?.user?.id || null
+      identity.current = currentId
+      const profileVersion = ++profileRequest.current
       const request = ++version
       setUser(session?.user || null)
       setProfile(null)
@@ -24,7 +30,7 @@ export function useAuth() {
       setLoading(true)
       try {
         const data = await getProfile(session.user.id)
-        if (active && request === version) setProfile(data)
+        if (active && request === version && profileVersion === profileRequest.current) setProfile(data)
       } catch (err) {
         if (active && request === version) setError(errorMessage(err))
       } finally {
@@ -38,5 +44,22 @@ export function useAuth() {
     // INITIAL_SESSION handles restoration as well as fresh login/logout.
     return () => { active = false; version++; subscription.unsubscribe() }
   }, [])
-  return { user, profile, loading, error }
+  // Keep other tabs/devices in sync without unmounting the conversation or exposing
+  // a public profile subscription. The current account is always readable via RLS.
+  useEffect(() => {
+    if (!user?.id || profile?.id !== user.id) return
+    let active = true
+    const refresh = async () => {
+      if (!active || identity.current !== user.id) return
+      const request = ++profileRequest.current
+      try {
+        const next = await getProfile(user.id)
+        if (active && request === profileRequest.current && identity.current === user.id) setProfile(next)
+      } catch { /* Keep the cached account while offline; retry on focus/online. */ }
+    }
+    const interval = setInterval(refresh, 15000)
+    window.addEventListener('focus', refresh); window.addEventListener('online', refresh)
+    return () => { active = false; clearInterval(interval); window.removeEventListener('focus', refresh); window.removeEventListener('online', refresh) }
+  }, [user?.id, profile?.id])
+  return { user, profile, loading, error, updateProfile }
 }

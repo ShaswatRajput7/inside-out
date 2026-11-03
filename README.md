@@ -272,6 +272,8 @@ The workflow installs Rust and platform libraries. The local machine must also h
 
 Chats now support five built-in illustrated backgrounds and private custom image uploads, shared by every participant. Use the palette button in a conversation header to preview, apply or reset a theme. Existing projects must apply the additive `003_conversation_themes.sql` migration before deploying this frontend. See [conversation theme setup, assets and verification](docs/CONVERSATION_THEMES.md) for rollout and extension details. No new environment variables or dependencies are needed.
 
+Account settings now include username changes, and message Edit/Delete actions live in a three-dot menu. The username feature requires `004_username_changes.sql` followed by the `change-username` Edge Function before frontend rollout. See [username setup and verification](docs/USERNAME_CHANGES.md). Passwords and existing conversations stay with the same account.
+
 ## Official references
 
 - [Supabase password auth](https://supabase.com/docs/guides/auth/passwords) and [confirmation configuration](https://supabase.com/docs/guides/auth/general-configuration).
