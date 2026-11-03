@@ -268,6 +268,10 @@ Artifacts are under `src-tauri/target/<target>/release/bundle/` when `--target` 
 
 The workflow installs Rust and platform libraries. The local machine must also have Rust to compile; `npm run tauri info` diagnoses prerequisites. App icons are generated from `public/icon.svg` using `npm run tauri icon public/icon.svg`.
 
+## Conversation themes
+
+Chats now support five built-in illustrated backgrounds and private custom image uploads, shared by every participant. Use the palette button in a conversation header to preview, apply or reset a theme. Existing projects must apply the additive `003_conversation_themes.sql` migration before deploying this frontend. See [conversation theme setup, assets and verification](docs/CONVERSATION_THEMES.md) for rollout and extension details. No new environment variables or dependencies are needed.
+
 ## Official references
 
 - [Supabase password auth](https://supabase.com/docs/guides/auth/passwords) and [confirmation configuration](https://supabase.com/docs/guides/auth/general-configuration).
