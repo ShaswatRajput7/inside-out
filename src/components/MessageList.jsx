@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, SmilePlus } from 'lucide-react'
 import { Avatar, ErrorNotice, Spinner } from './Shared'
 import { canReact, groupReactions, isActivelyViewing } from '../lib/messaging'
 import { deleteMessage, toggleReaction } from '../services/chatService'
@@ -87,7 +87,10 @@ export default function MessageList({ messages, reactions, members, userId, titl
       {showDate && <div className="date-divider"><span>{day}</span></div>}
       <article className={`message ${own ? 'own-message' : 'received-message'} ${editing === message.id ? 'is-editing' : ''}`} aria-label={own ? 'Your message' : `Message from ${name}`}>
         {!own && <Avatar name={name} small />}
-        <div className="message-body">
+        <div className={`message-body ${own && !message.deleted_at && editing !== message.id ? 'has-message-menu' : ''}`}>
+          {own && !message.deleted_at && editing !== message.id && <div className="message-actions message-menu-trigger" role="group" aria-label="Message options">
+            <MessageActions canEdit={message.kind === 'text'} canDelete onEdit={() => setEditing(message.id)} onDelete={() => setRemoving(message.id)} />
+          </div>}
           {!own && <div className="message-meta"><strong>{name}</strong></div>}
           {message.deleted_at ? <p className="deleted-message">This message was deleted</p> : editing === message.id ?
             <MessageEditor message={message} onDone={() => setEditing(null)} onChanged={refresh} /> : <>
@@ -95,8 +98,8 @@ export default function MessageList({ messages, reactions, members, userId, titl
               {message.content && <p>{message.content}</p>}
             </>}
           <div className="message-footer">
-            {!message.deleted_at && editing !== message.id && (own || eligible) && <div className="message-actions" role="group" aria-label="Message actions">
-              <MessageActions canReact={eligible} canEdit={own && message.kind === 'text'} canDelete={own} onReact={(anchor) => { reactionAnchor.current = anchor; setReacting(message.id) }} onEdit={() => setEditing(message.id)} onDelete={() => setRemoving(message.id)} />
+            {eligible && editing !== message.id && <div className="message-actions" role="group" aria-label="Message reactions">
+              <button className="icon-button" title="React with any emoji" aria-label="Add emoji reaction" onClick={(event) => { reactionAnchor.current = event.currentTarget; setReacting(message.id) }}><SmilePlus size={15} /></button>
             </div>}
             <span className="message-stamp">
               {message.edited_at && !message.deleted_at && <span className="edited-label">edited</span>}

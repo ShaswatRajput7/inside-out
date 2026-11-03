@@ -2,7 +2,7 @@
 
 Open the settings icon beside your account at the bottom of the sidebar, enter a new username, and save. Usernames remain unique and case-insensitive, with 3–24 ASCII letters/numbers/underscores. After a rename, log in with the **new username and the same password**. Your UUID, existing conversations, memberships, messages, reactions, and images stay attached to the same account. The previous username becomes available for another account. Display names that matched the old username follow the rename; any independently customized display name is preserved.
 
-Each eligible message has one three-dot button. It opens Add reaction, Edit message (your own text only), and Delete message (your own messages only). Delete still requires confirmation. Other people's messages offer reactions only. The menu supports outside click, Escape, arrow keys, Home/End, and positioning within the window; it closes when scrolling or resizing.
+Your messages have a three-dot button at the top-right of the bubble. It opens Edit message (text only) and Delete message; delete still requires confirmation. Reactions retain their separate button beside the timestamp on all eligible messages. Other people's messages offer reactions only. The menu supports outside click, Escape, arrow keys, Home/End, and positioning within the window; it closes when scrolling or resizing.
 
 ## How authentication stays consistent
 

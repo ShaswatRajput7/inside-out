@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal, Pencil, SmilePlus, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 
-export default function MessageActions({ canEdit, canDelete, canReact, onEdit, onDelete, onReact }) {
+export default function MessageActions({ canEdit, canDelete, onEdit, onDelete }) {
   const [open, setOpen] = useState(false), [position, setPosition] = useState({ left: 0, top: 0 })
   const trigger = useRef(null), menu = useRef(null)
   useLayoutEffect(() => {
@@ -33,7 +33,6 @@ export default function MessageActions({ canEdit, canDelete, canReact, onEdit, o
   }
   return <><button ref={trigger} className="icon-button" title="Message options" aria-label="Message options" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true) } }}><MoreHorizontal size={17} /></button>
     {open && createPortal(<div ref={menu} className="message-options-menu" role="menu" aria-label="Message options" style={position} onKeyDown={keys}>
-      {canReact && <button role="menuitem" onClick={() => choose(onReact)}><SmilePlus size={15} />Add reaction</button>}
       {canEdit && <button role="menuitem" onClick={() => choose(onEdit)}><Pencil size={15} />Edit message</button>}
       {canDelete && <button role="menuitem" className="danger" onClick={() => choose(onDelete)}><Trash2 size={15} />Delete message</button>}
     </div>, document.body)}
