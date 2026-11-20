@@ -1,0 +1,33 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { externalLinkUrl } from '../src/platform/links.js'
+
+const publicEnv = { VITE_SUPABASE_URL: 'https://example.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test' }
+function check(extra = {}) {
+  return spawnSync(process.execPath, ['scripts/check-desktop.mjs'], { encoding: 'utf8', env: { ...process.env, ...publicEnv, ...extra } })
+}
+test('desktop packaging accepts public configuration without logging the key', () => {
+  const result = check()
+  assert.equal(result.status, 0, result.stderr)
+  assert.ok(!result.stdout.includes(publicEnv.VITE_SUPABASE_PUBLISHABLE_KEY))
+})
+test('desktop packaging rejects missing, secret and service-role credentials', () => {
+  for (const key of ['', 'sb_secret_do_not_bundle', `x.${Buffer.from(JSON.stringify({ role: 'service_role' })).toString('base64url')}.x`]) {
+    const result = check({ VITE_SUPABASE_PUBLISHABLE_KEY: key })
+    assert.notEqual(result.status, 0)
+    if (key) assert.ok(!(result.stdout + result.stderr).includes(key))
+  }
+})
+test('legacy anon keys remain valid; custom endpoints require explicit CSP review', () => {
+  assert.equal(check({ VITE_SUPABASE_PUBLISHABLE_KEY: `x.${Buffer.from(JSON.stringify({ role: 'anon' })).toString('base64url')}.x` }).status, 0)
+  assert.notEqual(check({ VITE_SUPABASE_URL: 'https://example.com' }).status, 0)
+  assert.notEqual(check({ VITE_SUPABASE_URL: 'http://example.supabase.co' }).status, 0)
+})
+test('version tags must match the bundled version', () => {
+  assert.notEqual(check({ GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v999.0.0' }).status, 0)
+})
+test('external link adapter excludes script, file, data and application protocols', () => {
+  for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'data:text/html,test', 'tauri://localhost', 'not a URL']) assert.equal(externalLinkUrl(url), null)
+  assert.equal(externalLinkUrl('https://example.com/help'), 'https://example.com/help')
+})

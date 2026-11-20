@@ -4,6 +4,7 @@ import { imageExpired } from '../lib/messaging'
 import { downloadImage } from '../services/images'
 import { errorMessage } from '../lib/chat'
 import Modal from './Modal'
+import { saveImage } from '../platform/files.js'
 
 export default function ImageMessage({ message, now, shadow = false, revealed = false }) {
   const image = message.image
@@ -22,11 +23,12 @@ export default function ImageMessage({ message, now, shadow = false, revealed = 
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [image?.storage_path, expired, message.deleted_at, attempt])
   if (expired) return <div className="image-placeholder"><ImageOff size={19} />Image expired</div>
-  function download() {
+  async function download() {
     if (!url || imageExpired(image)) return
-    const anchor = document.createElement('a')
-    anchor.href = url; anchor.download = `inside-out-${image.id}.${image.mime_type === 'image/webp' ? 'webp' : image.mime_type === 'image/png' ? 'png' : 'jpg'}`
-    anchor.click()
+    setError('')
+    try {
+      await saveImage(url, `inside-out-${image.id}.${image.mime_type === 'image/webp' ? 'webp' : image.mime_type === 'image/png' ? 'png' : 'jpg'}`)
+    } catch (err) { setError(errorMessage(err)) }
   }
   if (shadow) return <div className={`image-message shadow-image ${revealed ? 'revealed' : ''}`}>{url ? <img src={url} width={image.width} height={image.height} alt="Hidden image" draggable={false} /> : <div className="image-placeholder">Hidden image</div>}</div>
   return <div className="image-message">{error ? <button className="image-placeholder" onClick={() => setAttempt(attempt + 1)}>Image unavailable. Retry</button> : url ? <><button className="image-thumbnail" onClick={() => setLarge(true)} aria-label="Open image preview"><img src={url} width={image.width} height={image.height} alt={`Image from ${message.sender?.display_name || 'a friend'}`} /></button><button className="image-download" onClick={download}><Download size={13} />Download</button></> : <div className="image-placeholder" role="status">Loading image…</div>}{large && !expired && <Modal title="Image preview" description="Images are available for 30 days after upload." onClose={() => setLarge(false)}><img className="large-image" src={url} alt="Shared image preview" /><button className="button secondary full-width" onClick={download}><Download size={15} />Download image</button></Modal>}</div>

@@ -10,3 +10,9 @@ the Rust plugin in `src-tauri/src/lib.rs`, and grant only its required permissio
 runtime. Do not branch on user-agent strings.
 
 Notification dispatch and click focus now live in `../notifications.js`, with explicit user-triggered permission requests. Background push, updater, tray support, and other native integrations remain unimplemented.
+
+Image saving lives in `../files.js` and uses official dialog/fs plugins only in
+Tauri. `../links.js` opens HTTP/HTTPS anchors with the opener plugin on desktop.
+The filesystem capability grants a write operation but no static path scope;
+only paths chosen through the save dialog are added at runtime. See
+`docs/DESKTOP_DISTRIBUTION.md` for build and distribution instructions.

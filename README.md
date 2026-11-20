@@ -82,7 +82,7 @@ The four public tables are `profiles`, `conversations`, `conversation_members`, 
 
 All conversation/membership writes go through fixed-search-path definer RPCs. Membership checks use private helper functions to avoid recursive RLS. Clients can only insert their own messages into their joined conversations and cannot set server timestamps, update/delete messages, or change memberships directly. Group creators alone manage membership; direct membership is immutable. A removed group member loses database access immediately; the UI discovers membership removal on its next refresh (at most 15 seconds while active). Previously delivered messages cannot be recalled from someone's screen or device.
 
-The group role column records creator/admin and member; no role promotion interface or wider permissions system is included. Removed members' old messages remain. Newly added members can read the group's full history. Plain text is rendered as React text, never HTML. Sessions persist in the browser/webview's local storage. Tauri exposes no filesystem or shell commands. Desktop builds are unsigned and have a CSP allowing only the app and Supabase connections.
+The group role column records creator/admin and member; no role promotion interface or wider permissions system is included. Removed members' old messages remain. Newly added members can read the group's full history. Plain text is rendered as React text, never HTML. Sessions persist in the browser/webview's local storage. Tauri provides native notifications and user-selected image saving; no shell commands are exposed. Desktop builds are unsigned and have a CSP allowing only the app and Supabase connections.
 
 ## Tests and verification limits
 
@@ -109,164 +109,26 @@ node --env-file=.env scripts/live-smoke.mjs
 
 This is opt-in and excluded from `npm test` and CI. It uses only the publishable key and normal user sessions. The script prints the local temporary fixture path without printing passwords. Avoid rerunning unnecessarily because Supabase signup limits apply.
 
-## Deploy the browser app to Cloudflare Pages
+## Existing web deployment — Vercel
 
-No deployment is performed automatically.
+The production React website is hosted on Vercel at https://inside-out-three.vercel.app.
+Keep the existing Vercel project, Git integration, build settings and public Supabase
+environment variables. The browser build remains `npm run build`, with output in `dist`.
+Desktop packaging does not deploy the website or load it at runtime. The legacy
+Cloudflare files are retained without changing hosting configuration.
 
-1. Put this project in your own GitHub repository (private is fine).
-2. In Cloudflare, open **Workers & Pages → Create application → Pages → Connect to Git** and choose that repository. Use the free plan.
-3. Set **Build command** to `npm run build`, **Build output directory** to `dist`, and root directory to the repository root. Set `NODE_VERSION` to `24` if the build settings allow it.
-4. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` under build environment variables. Use the same project as the desktop app. Apply them to production and preview if previews are desired.
-5. Deploy. Cloudflare supplies an HTTPS `*.pages.dev` URL; no custom domain is required. `public/_redirects` supports refreshes, and `public/_headers` supplies browser security headers. `wrangler.toml` identifies the static output directory.
-6. For consistency, set **Supabase Authentication → URL Configuration → Site URL** to the HTTPS Pages URL. This app uses password login directly, with no OAuth or email redirects.
+## Desktop development and installers
 
-Alternative direct upload after building:
+The same React UI is bundled locally with Tauri v2. Load Rust into your terminal with
+`source "$HOME/.cargo/env"`, then use `npm run desktop:dev`. The desktop dev server uses
+port 1420; browser development keeps port 5173. Keep the existing ignored `.env`.
+Supabase sessions persist in each webview's local storage; browser, desktop development,
+and packaged desktop sessions are separate. No new backend, schema, or authentication
+policy is needed.
 
-```sh
-npm run build
-npx wrangler pages deploy dist --project-name inside-out
-```
-
-Run that only when you intend to publish. Changing environment variables requires a fresh build/deployment. The free hosted Supabase tier can pause idle projects; resume an idle project in its dashboard if needed. GitHub Actions quotas and provider free-tier policies still apply.
-
-## Desktop development
-
-Keep developing features in the existing React components, hooks, and Supabase services.
-The native shell opens this same frontend; it does not load the deployed Cloudflare URL.
-No chat/auth code is forked, and no extra backend or Supabase schema is needed.
-Installers can be built later, when a version is ready to share.
-
-On this Mac, the minimal stable Rust/Cargo toolchain is installed without modifying shell
-profiles. Load Cargo into a fresh terminal session, then launch the desktop app:
-
-```sh
-source "$HOME/.cargo/env"
-npx tauri dev
-# Equivalent: npm run desktop:dev
-```
-
-Keep the existing `.env` with `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_PUBLISHABLE_KEY`. Do not copy the example over working credentials.
-Tauri starts Vite at **http://127.0.0.1:1420** automatically. `npm run dev` remains
-on port **5173**, so browser and desktop development can run at the same time.
-React changes hot-reload in the webview; Rust/config changes are handled by Tauri.
-Closing the window or stopping the dev command ends the development app. No installer,
-code signing, updater, notifications, or paid Apple account is involved.
-
-The window is titled **Inside Out**, starts centered at **1180 × 780**, resizes down to
-**760 × 560**, and uses the stable identifier **com.insideout.chat**. Keep that identifier
-stable for future builds. The non-incognito webview data store persists Supabase sessions
-between launches. Browser, desktop development, and a future packaged desktop app each
-have their own local session storage; log in once in each runtime. They all use the same
-Supabase accounts, conversations, and messages.
-
-Auth uses password requests directly (no OAuth/deep-link callback is needed). Supabase's
-existing auto-refresh, Postgres Changes subscriptions, reconnect/focus handlers, and
-history queries run inside the webview unchanged. CSP permits the Supabase HTTPS and
-WebSocket endpoints; development also permits the Vite HMR socket. Navigation is existing
-React state inside one HTML entry, with no server routes or new routing dependency.
-The Cloudflare build command, output directory, headers, and redirects are unchanged.
-
-For platform-specific work, use the browser-safe utility:
-
-```js
-import { isDesktop, getRuntime } from './platform/index.js'
-
-isDesktop()  // true in Tauri, false in the browser
-getRuntime() // 'tauri' or 'browser'
-```
-
-Future native adapters belong in `src/platform/desktop/`; its README explains where to
-add plugins and narrowly scoped Tauri capability permissions when a feature actually
-needs them. The current shell exposes no filesystem/shell/notification commands.
-Do not add native API imports to the chat or Supabase services.
-
-### Prerequisites on another Mac, Ubuntu, or Windows machine
-
-Install the stable Rust toolchain from https://rustup.rs. On macOS install Xcode command-line tools (`xcode-select --install`). If macOS bundling reports missing Xcode tools, install/select full Xcode as directed by Tauri. No paid Apple account is required.
-
-On Ubuntu 22.04/24.04 install:
-
-```sh
-sudo apt-get update
-sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev patchelf libayatana-appindicator3-dev
-```
-
-Then, with `.env` configured:
-
-```sh
-npm ci
-source "$HOME/.cargo/env"
-npx tauri dev
-```
-
-On **Windows 10/11 x64**, install Node.js, the stable Rust **MSVC** toolchain, and
-Microsoft C++ Build Tools with **Desktop development with C++** and a Windows SDK.
-Install the **Microsoft Edge WebView2 Evergreen Runtime** if it is missing. These are
-the standard [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/#windows).
-Open a new terminal after installing Rust so Cargo is available, configure the same
-`.env`, then run:
-
-```powershell
-npm ci
-npx tauri dev
-```
-
-Windows uses WebView2; macOS and Ubuntu use their system WebKit webviews. All run the
-same React frontend, password authentication, session storage, and Supabase HTTPS /
-Realtime WebSocket integration. No Windows-specific chat code or native permissions
-are needed. Windows login/session/realtime behavior still needs an actual Windows
-smoke test before distributing a release.
-
-### Future installers (not part of daily development)
-
-The existing manual GitHub workflow and bundle targets remain ready for later use.
-These commands are only needed when preparing a distributable release; no installers
-are created as part of `npx tauri dev`.
-
-macOS Apple Silicon, on a Mac:
-
-```sh
-rustup target add aarch64-apple-darwin
-npm run desktop:build -- --target aarch64-apple-darwin --bundles dmg
-```
-
-macOS Intel, on a Mac (Apple Silicon can use the macOS SDK to build this target):
-
-```sh
-rustup target add x86_64-apple-darwin
-npm run desktop:build -- --target x86_64-apple-darwin --bundles dmg
-```
-
-Ubuntu x64, **on Ubuntu**:
-
-```sh
-npm run desktop:build -- --bundles deb,appimage
-```
-
-Windows 10/11 x64, **on Windows**, when ready to build installers:
-
-```powershell
-rustup target add x86_64-pc-windows-msvc
-npm run desktop:build -- --target x86_64-pc-windows-msvc --bundles "nsis,msi"
-```
-
-This prepares an NSIS setup `.exe` and a WiX `.msi` in the `nsis/` and `msi/`
-bundle subdirectories. The configured WebView2 download bootstrapper installs the
-runtime if it is absent, using an internet connection. MSI builds require the Windows
-VBSCRIPT optional feature; see [Tauri's Windows installer guide](https://v2.tauri.app/distribute/windows-installer/)
-if WiX reports an error. No signing certificates or updater are configured.
-
-Artifacts are under `src-tauri/target/<target>/release/bundle/` when `--target` is supplied, otherwise `src-tauri/target/release/bundle/`. macOS installers are unsigned/unnotarized: recipients may need the normal macOS Privacy & Security **Open Anyway** flow. AppImage requires FUSE on some systems; `chmod +x ./Inside*.AppImage` then `./Inside*.AppImage --appimage-extract-and-run` is an alternative (use the actual filename). A `.deb` can be installed with `sudo apt install ./inside-out*.deb` (use the actual output filename).
-
-### GitHub Actions builds
-
-1. Push to your own repository. Add repository **Settings → Secrets and variables → Actions** secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
-2. Open **Actions → Desktop installers → Run workflow**.
-3. When manually triggered, the matrix builds Apple Silicon `.dmg` and Intel `.dmg` on macOS runners, Ubuntu x64 `.deb`/`.AppImage` on an Ubuntu runner, and Windows x64 NSIS `.exe`/`.msi` on a Windows runner. Download the resulting workflow artifacts. It does not publish releases or deploy the website. The workflow has not been triggered for this configuration change.
-4. Use GitHub's included runner allowance; private repository macOS jobs consume that allowance faster. Desktop builds are manual to avoid unnecessary usage. Each operating system builds its own installers; no cross-compilation setup is added.
-
-The workflow installs Rust and platform libraries. The local machine must also have Rust to compile; `npm run tauri info` diagnoses prerequisites. App icons are generated from `public/icon.svg` using `npm run tauri icon public/icon.svg`.
+See [desktop build, installation and verification instructions](docs/DESKTOP_DISTRIBUTION.md)
+for prerequisites, native platform builds, GitHub Actions artifacts, unsigned
+installation instructions, verification limits and version updates.
 
 ## Conversation themes
 
@@ -282,4 +144,4 @@ Account settings now include username changes, and message Edit/Delete actions l
 - [Supabase Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security) and [Postgres Changes](https://supabase.com/docs/guides/realtime/postgres-changes).
 - [Tauri GitHub builds](https://v2.tauri.app/distribute/pipelines/github/) and [icons](https://v2.tauri.app/develop/icons/).
 - [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/#windows) and [Windows installers / WebView2](https://v2.tauri.app/distribute/windows-installer/).
-- [Cloudflare Pages framework setup](https://developers.cloudflare.com/pages/framework-guides/).
+- [Vercel Vite deployment](https://vercel.com/docs/frameworks/frontend/vite).

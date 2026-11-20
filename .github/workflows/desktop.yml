@@ -1,68 +1,86 @@
-name: Desktop installers
+name: Desktop Build
 on:
   workflow_dispatch:
+  push:
+    tags: ['v*']
 permissions:
   contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   build:
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-15
             target: aarch64-apple-darwin
             bundles: dmg
-          - os: macos-latest
+            artifact: Inside-Out-macOS-arm64
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             bundles: dmg
+            artifact: Inside-Out-macOS-x64
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             bundles: deb,appimage
-          - os: windows-latest
+            artifact: Inside-Out-Ubuntu-x64
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
-            bundles: nsis,msi
+            bundles: nsis
+            artifact: Inside-Out-Windows-x64
     runs-on: ${{ matrix.os }}
     env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      CARGO_INCREMENTAL: '0'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - name: Check backend configuration
-        shell: bash
-        run: |
-          test -n "$VITE_SUPABASE_URL" || { echo 'Set VITE_SUPABASE_URL in repository Actions secrets'; exit 1; }
-          test -n "$VITE_SUPABASE_PUBLISHABLE_KEY" || { echo 'Set VITE_SUPABASE_PUBLISHABLE_KEY in repository Actions secrets'; exit 1; }
       - name: Install Linux build libraries
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev patchelf libayatana-appindicator3-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev patchelf libayatana-appindicator3-dev xdg-utils
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
       - run: npm ci
+      - run: npm run desktop:check
       - run: npm run lint
       - run: npm test
+      - name: Check Rust
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
+      # Tauri's beforeBuildCommand validates configuration and builds the shared React UI.
+      # Calling the official CLI directly avoids any GitHub Release publishing.
       - name: Build unsigned installers
         shell: bash
-        run: npm run desktop:build -- --target ${{ matrix.target }} --bundles "${{ matrix.bundles }}"
+        run: npm run desktop:build -- --ci --target ${{ matrix.target }} --bundles "${{ matrix.bundles }}"
         env:
           APPIMAGE_EXTRACT_AND_RUN: '1'
           NO_STRIP: 'true'
-      - uses: actions/upload-artifact@v4
+      - name: Verify every requested installer and record checksums
+        run: node scripts/verify-installers.mjs ${{ matrix.target }} ${{ matrix.bundles }}
+      - uses: actions/upload-artifact@v6
         with:
-          name: inside-out-${{ matrix.target }}
+          name: ${{ matrix.artifact }}
+          retention-days: 14
+          compression-level: 0
           path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/installers.json
             src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
             src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
             src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
-            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
           if-no-files-found: error
