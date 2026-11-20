@@ -17,7 +17,7 @@ export const createGroup = (name, ids) => unwrap(supabase.rpc('create_group', { 
 export const addMember = (id, username) => unwrap(supabase.rpc('add_group_member', { target_conversation: id, exact_username: username }))
 export const removeMember = (id, userId) => unwrap(supabase.rpc('remove_group_member', { target_conversation: id, target_user: userId }))
 export async function getConversations() {
-  const data = await unwrap(supabase.from('conversations').select('id,type,name,created_by,created_at,members:conversation_members(user_id,role,profile:profiles!conversation_members_user_id_fkey(id,username,display_name))').order('created_at', { ascending: false }))
+  const data = await unwrap(supabase.from('conversations').select('id,type,name,created_by,created_at,members:conversation_members(user_id,role,cleared_at,profile:profiles!conversation_members_user_id_fkey(id,username,display_name))').order('created_at', { ascending: false }))
   return data || []
 }
 export async function getMessages(id, { before, after, forward = false, limit = 50 } = {}) {
@@ -51,3 +51,5 @@ export async function getReactions(conversationId, messageIds) {
 }
 export const getMessage = (id) => unwrap(supabase.from('messages').select(MESSAGE_FIELDS).eq('id', id).single())
 export const getMessagesByIds = (ids) => unwrap(supabase.from('messages').select(MESSAGE_FIELDS).in('id', ids))
+
+export const clearConversation = (id) => unwrap(supabase.rpc('clear_conversation_history', { target_conversation: id }))

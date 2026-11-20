@@ -1,3 +1,4 @@
+import { shadowEnabled } from '../lib/shadow.js'
 import { isDesktop } from './index.js'
 
 export function claimNotification(storage, userId, messageId) {
@@ -36,9 +37,9 @@ export async function notifyMessage({ userId, messageId, conversationId, title, 
     if (isDesktop()) {
       const api = await import('@tauri-apps/plugin-notification')
       if (!await api.isPermissionGranted()) return
-      await api.sendNotification({ title, body, extra: { conversationId } })
+      await api.sendNotification({ title, body: shadowEnabled() ? 'New message' : body, extra: { conversationId } })
     } else if ('Notification' in window && Notification.permission === 'granted') {
-      const notification = new Notification(title, { body, tag: messageId })
+      const notification = new Notification(title, { body: shadowEnabled() ? 'New message' : body, tag: messageId })
       notification.onclick = () => { window.focus(); onNavigate(conversationId); notification.close() }
     }
   }

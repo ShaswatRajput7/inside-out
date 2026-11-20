@@ -5,14 +5,14 @@ import { conversationTitle, errorMessage } from '../lib/chat'
 import { canReact, isActivelyViewing, notificationText } from '../lib/messaging'
 import { notifyMessage, requestNotifications, watchNotificationClicks } from '../platform/notifications'
 
-export function useChatActivity({ conversations, userId, activeId, onNavigate }) {
+export function useChatActivity({ conversations, userId, activeId, onNavigate, shadow }) {
   const [unreads, setUnreads] = useState({})
   const countsRequest = useRef(0)
   const [notificationError, setNotificationError] = useState('')
   const settingKey = `inside-out:notifications:${userId}`
   const [notifications, setNotifications] = useState(() => { try { return localStorage.getItem(settingKey) === 'true' } catch { return false } })
-  const latest = useRef({ conversations, activeId, onNavigate, notifications })
-  latest.current = { conversations, activeId, onNavigate, notifications }
+  const latest = useRef({ conversations, activeId, onNavigate, notifications, shadow })
+  latest.current = { conversations, activeId, onNavigate, notifications, shadow }
   const [activityError, setActivityError] = useState('')
   const channelIds = conversations.map((conversation) => conversation.id).sort().join(',')
   const refresh = useCallback(async () => {
@@ -43,7 +43,7 @@ export function useChatActivity({ conversations, userId, activeId, onNavigate })
           if (!conversation) return
           await notifyMessage({ userId, messageId: raw.id, conversationId: raw.conversation_id,
             title: conversation.type === 'group' ? `${message.sender?.display_name} · ${conversationTitle(conversation, userId)}` : message.sender?.display_name || 'New message',
-            body: notificationText(message), onNavigate: (id) => latest.current.onNavigate(id) })
+            body: latest.current.shadow ? 'New message' : notificationText(message), onNavigate: (id) => latest.current.onNavigate(id) })
         } catch { /* Notification delivery never blocks messaging. */ }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversation_members', filter: `user_id=eq.${userId}` }, update)
@@ -73,5 +73,5 @@ export function useChatActivity({ conversations, userId, activeId, onNavigate })
     try { await markRead(conversationId, messageId); await refresh(); return true }
     catch (error) { setActivityError(errorMessage(error)); return false }
   }, [refresh])
-  return { unreads, read, notifications, toggleNotifications, activityError, notificationError }
+  return { unreads, read, refresh, notifications, toggleNotifications, activityError, notificationError }
 }

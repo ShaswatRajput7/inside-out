@@ -9,9 +9,23 @@ import EmojiPicker from './EmojiPicker'
 import MessageEditor from './MessageEditor'
 import ImageMessage from './ImageMessage'
 import Modal from './Modal'
+import ShadowMessage from './ShadowMessage'
+import { useHoldReveal } from '../hooks/useHoldReveal'
 import MessageActions from './MessageActions'
 
-export default function MessageList({ messages, reactions, members, userId, title, loading, hasOlder, loadingOlder, loadOlder, refresh, onRead }) {
+export default function MessageList({ messages, reactions, members, userId, title, loading, hasOlder, loadingOlder, loadOlder, refresh, onRead, shadow }) {
+  const reveal = useHoldReveal()
+  const hideRevealed = reveal.hide
+  useEffect(() => {
+    if (!shadow) return
+    const preventCopy = (event) => {
+      if (event.target.closest?.('input, textarea, [contenteditable="true"]')) return
+      event.preventDefault(); hideRevealed()
+    }
+    document.addEventListener('copy', preventCopy, true)
+    document.addEventListener('cut', preventCopy, true)
+    return () => { document.removeEventListener('copy', preventCopy, true); document.removeEventListener('cut', preventCopy, true) }
+  }, [shadow, hideRevealed])
   const ref = useRef(null)
   const previous = useRef({ first: null, last: null, height: 0, nearBottom: true })
   const latest = useRef({ messages, onRead })
@@ -87,13 +101,13 @@ export default function MessageList({ messages, reactions, members, userId, titl
       {showDate && <div className="date-divider"><span>{day}</span></div>}
       <article className={`message ${own ? 'own-message' : 'received-message'} ${editing === message.id ? 'is-editing' : ''}`} aria-label={own ? 'Your message' : `Message from ${name}`}>
         {!own && <Avatar name={name} small />}
-        <div className={`message-body ${own && !message.deleted_at && editing !== message.id ? 'has-message-menu' : ''}`}>
+        <div className={`message-body ${own && !message.deleted_at && editing !== message.id ? 'has-message-menu' : ''}`} onPointerDown={(event) => { if (shadow && event.pointerType === 'mouse' && event.button === 0 && !event.target.closest('button')) { event.preventDefault(); reveal.start(message.id) } }} onPointerLeave={shadow ? reveal.hide : undefined}>
           {own && !message.deleted_at && editing !== message.id && <div className="message-actions message-menu-trigger" role="group" aria-label="Message options">
-            <MessageActions canEdit={message.kind === 'text'} canDelete onEdit={() => setEditing(message.id)} onDelete={() => setRemoving(message.id)} />
+            <MessageActions canEdit={!shadow && message.kind === 'text'} canDelete onEdit={() => setEditing(message.id)} onDelete={() => setRemoving(message.id)} />
           </div>}
           {!own && <div className="message-meta"><strong>{name}</strong></div>}
-          {message.deleted_at ? <p className="deleted-message">This message was deleted</p> : editing === message.id ?
-            <MessageEditor message={message} onDone={() => setEditing(null)} onChanged={refresh} /> : <>
+          {message.deleted_at ? <p className="deleted-message">This message was deleted</p> : !shadow && editing === message.id ?
+            <MessageEditor message={message} onDone={() => setEditing(null)} onChanged={refresh} /> : shadow ? <ShadowMessage message={message} now={currentTime} reveal={reveal} /> : <>
               {message.kind === 'image' && <ImageMessage message={message} now={currentTime} />}
               {message.content && <p>{message.content}</p>}
             </>}
