@@ -33,11 +33,52 @@ Each local bundle directory also contains `installers.json`. CI installers may h
 different bytes/checksums because of native runner/toolchain and packaging metadata;
 use the manifest belonging to the downloaded artifact.
 
-## Pending / limits
+## Successful native CI build
 
-Native CI builds for macOS ARM/Intel, Windows NSIS, Ubuntu DEB/AppImage will be
-recorded after the workflow completes. Windows and Ubuntu GUI runtime tests are
-pending; no such desktop environment is connected here.
+[Desktop Build run 44742971904](https://github.com/ShaswatRajput7/inside-out/actions/runs/44742971904)
+completed successfully for all four jobs. Built commit:
+`7a340132f0118f7647d560a9b6398ac78ffc824e` on `desktop/installers`.
+All jobs passed frontend lint, all **86 tests**, public configuration/version
+validation, Cargo checks, production frontend build, release packaging, installer
+validation and artifact upload. macOS ARM and Intel each ran on their native
+architecture; Ubuntu 22.04 and Windows 2022 built their own packages.
+
+The first run passed macOS/Linux packaging but exposed a Windows CRLF parsing
+issue in the new version validator. That was fixed with a regression test, and
+the full corrected run passed. Installer validation was also exercised locally
+with temporary fixtures: missing or empty requested formats fail, while a complete
+set produces a manifest with byte sizes and SHA-256 checksums.
+
+All five final installers were downloaded into the ignored `desktop-artifacts/`
+folder. Each file's byte size and SHA-256 were independently compared with its
+CI manifest and matched.
+
+| Installer (relative to `desktop-artifacts/`) | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `Inside-Out-Ubuntu-x64/deb/Inside Out_1.0.0_amd64.deb` | 5424100 | `097e257cc596460d4cf59a283fa110c45b81ecef9a60937ff69648787553936f` |
+| `Inside-Out-Ubuntu-x64/appimage/Inside Out_1.0.0_amd64.AppImage` | 83540472 | `43bccf7dd503dd5168a639f2cc0fbeab9f5d0be0fbfdc61a43113ff819fd5e95` |
+| `Inside-Out-Windows-x64/nsis/Inside Out_1.0.0_x64-setup.exe` | 2611011 | `a681130c896ed379d6e72f55386c2f79234c05d76fb9267ec582c64b335e2f4b` |
+| `Inside-Out-macOS-arm64/dmg/Inside Out_1.0.0_aarch64.dmg` | 3744250 | `b94bf820ae960551036f224afc04b2ef9696fea2c657bb00cff7859d43c06012` |
+| `Inside-Out-macOS-x64/dmg/Inside Out_1.0.0_x64.dmg` | 3833491 | `a09cd61f3275714c93c305cd24b7b4f70e9622cb905118196a0bbf558e4371fc` |
+
+Direct GitHub artifact ZIP downloads (expire after 14 days):
+
+- [Inside-Out-macOS-arm64](https://github.com/ShaswatRajput7/inside-out/actions/runs/44742971904/artifacts/14631538933)
+- [Inside-Out-macOS-x64](https://github.com/ShaswatRajput7/inside-out/actions/runs/44742971904/artifacts/14632541912)
+- [Inside-Out-Windows-x64](https://github.com/ShaswatRajput7/inside-out/actions/runs/44742971904/artifacts/14632482144)
+- [Inside-Out-Ubuntu-x64](https://github.com/ShaswatRajput7/inside-out/actions/runs/44742971904/artifacts/14632441067)
+
+The Ubuntu DEB was inspected as a Debian archive: version 1.0.0, architecture
+amd64, GTK/WebKit dependencies, binary, desktop launcher and branded icons. The
+AppImage was identified as x86_64 ELF. The Windows output was identified as a
+Nullsoft self-extracting installer (its NSIS bootstrap stub is PE32; the app was
+built for `x86_64-pc-windows-msvc`). These checks do not substitute for running the
+installed applications on those systems.
+
+## Pending runtime testing / limits
+
+Windows and Ubuntu GUI runtime tests are pending; no such desktop environment is
+connected here. Intel Mac hardware testing also remains pending.
 
 Installed-app login/session persistence, direct/group messaging, real-time delivery,
 image upload/paste/preview/save, notifications, reactions, theme changes, Chat Magic,
@@ -56,3 +97,30 @@ toolchain. Cargo compilation/checks succeeded; no formatting failure was reporte
 
 See [distribution instructions](DESKTOP_DISTRIBUTION.md) for installation, security
 prompts, artifact downloads, build prerequisites and manual updates.
+
+## Files changed
+
+- `.github/workflows/desktop.yml`: native four-platform matrix, manual/version-tag
+  triggers, configuration/tests/Cargo checks, package verification, 14-day artifacts.
+- `src-tauri/tauri.conf.json`: release validation/build hook, NSIS-only Windows
+  packaging and per-user installation; existing identifier, icons, window, CSP,
+  WebView2 bootstrapper and persistent webview retained.
+- `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/src/lib.rs`,
+  `src-tauri/capabilities/default.json`: official dialog/fs/opener plugins and
+  narrowly scoped capabilities, preserving notifications and window focus.
+- `package.json`, `package-lock.json`: native adapter dependencies and desktop
+  configuration check command.
+- `src/platform/files.js`, `src/platform/links.js`, `src/main.jsx`,
+  `src/components/ImageMessage.jsx`: native image saving and system-browser links
+  with browser behavior preserved.
+- `scripts/check-desktop.mjs`, `scripts/verify-installers.mjs`,
+  `tests/desktop.test.js`: public-key/version validation, bundle manifests,
+  credentials/protocol/Windows-line-ending regression checks.
+- `README.md`, `src/platform/desktop/README.md`, `docs/DESKTOP_DISTRIBUTION.md`,
+  `docs/DESKTOP_BUILD_RESULTS.md`, `.gitignore`: corrected Vercel documentation,
+  build/install/update instructions, verification evidence and ignored downloads.
+
+The existing Vercel project/configuration, production `main`, and live Supabase
+schema/policies/data were preserved. Work was pushed only to `desktop/installers`
+with Vercel skip markers; GitHub reported no deployment for the build commit.
+The two public Supabase settings were supplied as repository Actions variables.

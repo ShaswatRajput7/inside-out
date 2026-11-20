@@ -188,7 +188,10 @@ Clear Chat, messages, edits, uploads and theme changes mutate production data; u
 a test project or explicit permission for these checks. Read-only Supabase Auth
 reachability can be tested without signing in or changing records.
 
-See `DESKTOP_BUILD_RESULTS.md` for the actual checks completed in this session.
+See [build results and installer paths](DESKTOP_BUILD_RESULTS.md) for the completed
+native CI builds, artifact links, checksums and actual runtime verification limits.
+Downloaded installers are also available locally in the ignored `desktop-artifacts/`
+folder.
 
 ## Producing an update
 
